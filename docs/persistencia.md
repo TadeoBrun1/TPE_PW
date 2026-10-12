@@ -71,6 +71,22 @@ Esto genera automáticamente código Go tipado dentro de `db/sqlc`.
 
 Los archivos generados no deben modificarse manualmente, ya que pueden volver a generarse a partir del esquema y las consultas SQL.
 
+
+## Uso desde la API
+
+El código generado por `sqlc` es utilizado por los handlers de la API REST (`handlers.go`). En `main.go` se abre la conexión con `database/sql` y el driver `lib/pq`, y se crea el repositorio con `db.New(connection)`. Cada operación HTTP utiliza el método de `sqlc` correspondiente:
+
+* `POST /avistamientos` utiliza `CreateAvistamiento`;
+* `GET /avistamientos` utiliza `ListAvistamientos`;
+* `GET /avistamientos/{id}` utiliza `GetAvistamiento`;
+* `PUT /avistamientos/{id}` utiliza `UpdateAvistamiento`;
+* `DELETE /avistamientos/{id}` utiliza `DeleteAvistamiento`.
+Dado que `UpdateAvistamiento` y `DeleteAvistamiento` están definidas con `:exec`, no informan si el identificador existía. Por ese motivo, los handlers consultan primero el registro con `GetAvistamiento` y responden 404 si no existe.
+
+Los campos opcionales se almacenan como `NULL` y `sqlc` los representa con `sql.NullString`. La API los convierte a `null` en el JSON de respuesta.
+
+
+
 ## Base de datos de pruebas
 
 Los tests utilizan una instancia PostgreSQL ejecutada mediante Docker Compose.
@@ -80,6 +96,8 @@ La base utilizada para las pruebas se denomina:
 `tpe_pw_test`
 
 Al inicializar el contenedor, el archivo `db/schema/schema.sql` se monta en el directorio de inicialización de PostgreSQL, por lo que la estructura de la base se crea automáticamente.
+
+El servicio `db` publica el puerto `5433` en la máquina local. El servicio `app` de la API usa la misma base, por lo que comparten esquema y datos; para las pruebas, los contenedores y volúmenes se eliminan al comenzar y al terminar.
 
 Los tests realizan un ciclo CRUD completo sobre la entidad `Avistamiento`, comprobando las operaciones de creación, consulta, actualización, listado y eliminación.
 
@@ -102,3 +120,11 @@ realiza las tareas necesarias para disponer de un entorno reproducible:
 * elimina finalmente los contenedores y volúmenes utilizados.
 
 La limpieza final se realiza incluso si ocurre un error durante la ejecución, evitando dejar recursos Docker asociados a los tests.
+
+La disponibilidad se comprueba con `pg_isready -h localhost`, que se conecta por red. Durante la inicialización, PostgreSQL ejecuta un servidor temporal que solo escucha por socket local; de esta manera la base no se considera disponible hasta que el servidor definitivo está iniciado y el esquema ya fue aplicado.
+
+Para probar la API completa (base de datos, aplicación y todos los endpoints) se utiliza:
+
+
+`make test-api`
+

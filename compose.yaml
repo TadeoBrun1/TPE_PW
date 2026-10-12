@@ -19,6 +19,17 @@ services:
       interval: 2s
       timeout: 2s
       retries: 15
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/tpe_pw_test?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
 
 volumes:
   postgres_test_data:
