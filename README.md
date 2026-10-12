@@ -2,7 +2,7 @@
 
 Aplicación web para el registro y consulta de avistamientos de jabalíes.
 
-En esta entrega se expone la capa de persistencia (PostgreSQL+ `sqlc`) mediante una **API REST con JSON** para la entidad `Avistamiento`. La aplicación, la base de datos y las pruebas se ejecutan con Docker.
+En esta entrega se expone la capa de persistencia (PostgreSQL + `sqlc`) mediante una **API REST con JSON** para la entidad `Avistamiento`. La aplicación, la base de datos y las pruebas se ejecutan con Docker.
 
 ## Requisitos
 
@@ -13,7 +13,6 @@ Para ejecutar los tests es necesario disponer de:
 * Docker Compose
 * Make
 * `curl` y `bash`
-
 
 No es necesario crear manualmente la base de datos ni instalar `sqlc` globalmente. El proceso de testing se encarga de preparar automáticamente el entorno necesario.
 
@@ -115,10 +114,10 @@ Ejemplo del JSON de un avistamiento:
   "email_reportante": "tomas@test.com"
 }
 ```
-*Obligatorios: `fecha_hora`,`ubicacion`y`descripcion`(no pueden estar vacios).
-*Opcionales: `imagen`,`detalle_destrozos`,`nombre_reportante`y`email_reportante`.Pueden omitirse o enviarse como `null`.
-*Las respuestas incluyen además `id` y `created_at`, que asigna el servidor.
-*`PUT` reemplaza el registro completo: un campo opcional que no se envia queda en `null`.
+* Obligatorios: `fecha_hora`, `ubicacion` y `descripcion` (no pueden estar vacios).
+* Opcionales: `imagen`,`detalle_destrozos`,`nombre_reportante`y`email_reportante`.Pueden omitirse o enviarse como `null`.
+* Las respuestas incluyen además `id` y `created_at`, que asigna el servidor.
+* `PUT` reemplaza el registro completo: un campo opcional que no se envia queda en `null`.
 
 ## Ejecutar la API
 
@@ -132,6 +131,7 @@ Se levantan dos contenedores:
 
 * `db`: PostgreSQL con el esquema de `db/schema/schema.sql` ya aplicado. También queda accesible desde la computadora en `localhost:5433`.
 * `app`: la API, disponible en <http://localhost:8080>. Arranca cuando la base está lista.
+
 Para detenerla, `Ctrl+C` y luego:
 
 ```bash
@@ -166,6 +166,7 @@ Este comando realiza automáticamente las siguientes tareas:
 7. Espera hasta que la API responda.
 8. Prueba cada uno de los endpoints con `requests.sh`.
 9. Elimina los contenedores y volúmenes utilizados al finalizar.
+
 La limpieza del entorno también se realiza si ocurre un error durante la ejecución. Si alguna prueba falla, el comando termina con error y muestra los logs de la aplicación.
 
 Con la API ya corriendo, las pruebas también se pueden ejecutar por separado:
@@ -187,9 +188,6 @@ curl -i -X POST http://localhost:8080/avistamientos \
 > `make test` y `make test-api` ejecutan `docker compose down -v`, por lo que eliminan los datos de la base. Conviene usarlos con la API detenida.
 
 
-
-
-
 ## Estructura principal
 
 ```text
@@ -208,7 +206,7 @@ curl -i -X POST http://localhost:8080/avistamientos \
 │   └── persistencia.md
 ├── .dockerignore
 ├── compose.yaml
-├── dockerfile
+├── Dockerfile
 ├── Makefile
 ├── sqlc.yaml
 ├── go.mod

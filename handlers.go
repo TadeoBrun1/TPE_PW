@@ -17,7 +17,7 @@ type avistamientoRequest struct {
 	Ubicacion        string    `json:"ubicacion"`
 	Descripcion      string    `json:"descripcion"`
 	Imagen           *string   `json:"imagen"`
-	HuboDestrozos    bool      `json:"hubo_destrozoz"`
+	HuboDestrozos    bool      `json:"hubo_destrozos"`
 	DetalleDestrozos *string   `json:"detalle_destrozos"`
 	NombreReportante *string   `json:"nombre_reportante"`
 	EmailReportante  *string   `json:"email_reportante"`
