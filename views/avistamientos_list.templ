@@ -1,0 +1,33 @@
+package views
+
+import db "tp1/db/sqlc"
+
+templ AvistamientosList(avistamientos []db.Avistamiento){
+    <h2>Avistamientos registrados</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Ubicación</th>
+                <th>Descripción</th>
+                <th>Destrozos</th>
+            </tr>
+        </thead>
+        <tbody>
+            for _, avistamiento := range avistamientos{
+                <tr>
+                    <td>{ avistamiento.FechaHora.Format("02/01/2006 15:04") }</td>
+                    <td>{ avistamiento.Ubicacion }</td>
+                    <td>{ avistamiento.Descripcion }</td>
+                    <td>
+                        if avistamiento.HuboDestrozos {
+                            Sí
+                        }else{
+                            No
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

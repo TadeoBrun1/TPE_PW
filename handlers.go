@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	db "tp1/db/sqlc"
+	"tp1/views"
 )
 
 type avistamientoRequest struct {
@@ -224,4 +225,16 @@ func validateAvistamiento(request avistamientoRequest) error {
 		return errors.New("La descripcion del avistamiento no puede estar vacia")
 	}
 	return nil
+}
+
+func (server *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
+	avistamientos, err := server.queries.ListAvistamientos(r.Context())
+	if err != nil {
+		http.Error(w, "No se pudieron obtener los avistamientos", http.StatusInternalServerError)
+		return
+	}
+	err = views.IndexPage(avistamientos).Render(r.Context(), w)
+	if err != nil {
+		http.Error(w, "No se pudo renderizar la pagina", http.StatusInternalServerError)
+	}
 }

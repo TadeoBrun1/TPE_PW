@@ -33,12 +33,7 @@ func main() {
 	log.Println("Conectando a PostgreSQL")
 
 	server := &Server{queries: db.New(conn)}
-
-	http.HandleFunc("POST /avistamientos", server.createAvistamiento)
-	http.HandleFunc("GET /avistamientos", server.listAvistamientos)
-	http.HandleFunc("GET /avistamientos/{id}", server.getAvistamiento)
-	http.HandleFunc("PUT /avistamientos/{id}", server.updateAvistamiento)
-	http.HandleFunc("DELETE /avistamientos/{id}", server.deleteAvistamiento)
+	http.HandleFunc("GET /{$}", server.indexHandler)
 
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
