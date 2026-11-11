@@ -238,3 +238,48 @@ func (server *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No se pudo renderizar la pagina", http.StatusInternalServerError)
 	}
 }
+
+func (server *Server) crearvistamientoForm(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Formulario invalido", http.StatusBadRequest)
+		return
+	}
+
+	ubicacion := strings.TrimSpace(r.FormValue("ubicacion"))
+	descripcion := strings.TrimSpace(r.FormValue("descripcion"))
+	if ubicacion == "" || descripcion == "" {
+		http.Error(w, "la ubicacion y descripcion son obligatorios", http.StatusBadRequest)
+		return
+	}
+
+	fechaHora, err := time.Parse("2006-01-02T15:04", r.FormValue("fecha_hora"))
+	if err != nil {
+		http.Error(w, "Fecha y hora invalidos", http.StatusBadRequest)
+		return
+	}
+
+	huboDestrozos := r.FormValue("hubo_destrozos") == "on"
+
+	_, err = server.queries.CreateAvistamiento(r.Context(), db.CreateAvistamientoParams{
+		FechaHora:        fechaHora,
+		Ubicacion:        ubicacion,
+		Descripcion:      descripcion,
+		HuboDestrozos:    huboDestrozos,
+		DetalleDestrozos: textoOpcional(r.FormValue("detalle_destrozos")),
+		Imagen:           textoOpcional(r.FormValue("imagen")),
+		NombreReportante: textoOpcional(r.FormValue("nombre_reportante")),
+		EmailReportante:  textoOpcional(r.FormValue("email_reportante")),
+	})
+	if err != nil {
+		http.Error(w, "No se pudo guardar el avistamiento", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+
+}
+
+func textoOpcional(texto string) sql.NullString {
+	textolimpio := strings.TrimSpace(texto)
+	return sql.NullString{String: textolimpio, Valid: textolimpio != ""}
+}

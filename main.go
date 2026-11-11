@@ -34,16 +34,7 @@ func main() {
 
 	server := &Server{queries: db.New(conn)}
 	http.HandleFunc("GET /{$}", server.indexHandler)
-
-	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		http.ServeFile(w, r, "./index.html")
-
-	}))
+	http.HandleFunc("POST /avistamientos", server.crearvistamientoForm)
 
 	port := ":8080"
 	fmt.Printf("Servidor ESTÁTICO escuchando en http://localhost%s\n", port)

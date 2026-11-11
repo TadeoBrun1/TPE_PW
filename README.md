@@ -2,7 +2,7 @@
 
 Aplicación web para el registro y consulta de avistamientos de jabalíes.
 
-En esta entrega se expone la capa de persistencia (PostgreSQL + `sqlc`) mediante una **API REST con JSON** para la entidad `Avistamiento`. La aplicación, la base de datos y las pruebas se ejecutan con Docker.
+En esta entrega la interfaz se renderiza del lado del servidor con [`templ`](https://templ.guide/): el servidor Go consulta la base de datos (PostgreSQL + `sqlc`) y responde con el HTML ya armado. No se usa JavaScript en el cliente. La aplicación y la base de datos se ejecutan con docker.
 
 ## Requisitos
 
@@ -12,11 +12,71 @@ Para ejecutar los tests es necesario disponer de:
 * Docker
 * Docker Compose
 * Make
-* `curl` y `bash`
 
-No es necesario crear manualmente la base de datos ni instalar `sqlc` globalmente. El proceso de testing se encarga de preparar automáticamente el entorno necesario.
 
-Los puertos **8080** (API) y **5433** (PostgreSQL) deben estar libres.
+No es necesario instalar `sqlc` ni `templ` globalmente: el `Makefile` los ejecuta con `go run` en una versión fija. Tampoco hace falta crear manualmente la base de datos.
+
+Los puertos **8080** (aplicacion) y **5433** (PostgreSQL) deben estar libres.
+
+## Ejecucion
+
+Desde la raiz del proyecto:
+
+```
+make run
+```
+
+Este comando genera el codigo de `sqlc` y de `templ`,construye la imagen y levanta dos contenedores:
+- `db`:PostgreSQL con el esquema de `db/schema/shcema.sql` ya aplicado. Tambien queda accesible desde la computadora en `localhost:5433`.
+- `app`:la aplicacion, disponible en [http://localhost:8080](http://localhost:8080). Arranca cuando la base esta lista.
+
+Para detenerla:
+
+```
+make down     # conserva los datos
+make clean    # además elimina los datos
+```
+# Comandos disponibles
+ 
+| Comando         | Descripción                                                              |
+|-----------------|--------------------------------------------------------------------------|
+| `make generate` | Genera el código Go de las consultas (`sqlc`) y de las vistas (`templ`)  |
+| `make build`    | Genera el código y compila el proyecto                                   |
+| `make run`      | Genera el código y levanta la base de datos y la aplicación con Docker   |
+| `make test`     | Ejecuta los tests de persistencia contra una base temporal en Docker     |
+| `make down`     | Detiene los contenedores y conserva los datos                            |
+| `make clean`    | Detiene los contenedores y elimina los datos                             |
+ 
+> `make test` ejecuta `docker compose down -v`, por lo que elimina los datos de la base. Conviene usarlo con la aplicación detenida.
+
+## Rutas
+
+| Método | Ruta             | Descripción                                                                  |
+|--------|------------------|------------------------------------------------------------------------------|
+| `GET`  | `/`              | Página principal: formulario y lista de avistamientos                        |
+| `POST` | `/avistamientos` | Recibe el formulario, guarda el avistamiento y redirige a `/` (303)  
+
+Al enviar el formulario se aplica el patron Post/Redirect/Get: tras guardar, el servidor redirige a `/`, que muestra la lista actualizada.
+
+Campos del formulario:
+
+- Obligatorios: fecha y hora, ubicación y descripción.
+- Opcionales: si hubo destrozos, detalle de los destrozos, imagen, nombre y email de quien reporta. Los campos opcionales vacíos se guardan como `NULL`.
+Si faltan datos obligatorios o la fecha es inválida, el servidor responde con un error 400 y no guarda nada.
+
+## Vistas
+
+Los componentes `templ` se encuentran en `views/`:
+
+```
+views/layout.templ               # estructura base de la página (HTML, HEAD, BODY)
+views/avistamiento_form.templ    # formulario para crear un avistamiento
+views/avistamientos_list.templ   # tabla con los avistamientos
+views/index_page.templ           # página principal: arma layout, formulario y lista
+```
+
+Cada `.templ` se compila a un archivo `_templ.go` con `make generate`. Los estilos provienen de [Pico.css](https://picocss.com/), cargado desde un CDN.
+
 
 ## Persistencia
 
@@ -56,13 +116,13 @@ docs/persistencia.md
 
 Desde la raíz del proyecto ejecutar:
 
-```bash
+```
 make test
 ```
 
 Este comando realiza automáticamente las siguientes tareas:
 
-1. Genera el código Go utilizando `sqlc`.
+1. Genera el código Go utilizando `sqlc` y `templ`.
 2. Compila el proyecto.
 3. Elimina contenedores y volúmenes de pruebas anteriores.
 4. Levanta una instancia PostgreSQL mediante Docker Compose.
@@ -71,122 +131,7 @@ Este comando realiza automáticamente las siguientes tareas:
 7. Ejecuta los tests con el paquete `testing` de Go.
 8. Elimina los contenedores y volúmenes utilizados al finalizar.
 
-La limpieza del entorno también se realiza si ocurre un error durante la ejecución.
-
-## Tests de persistencia
-
-Los tests realizan un ciclo CRUD completo sobre la entidad `Avistamiento`:
-
-* creación;
-* consulta por identificador;
-* actualización;
-* listado;
-* eliminación.
-
-La base de datos utilizada para los tests es temporal y se ejecuta dentro de Docker, evitando depender de una base PostgreSQL previamente configurada en la computadora.
-
-## API REST
-
-La API expone la entidad `Avistamiento` con los siguientes endpoints:
-
-| Método   | Ruta                  | Descripción                            | Respuestas    |
-|----------|-----------------------|----------------------------------------|---------------|
-| `GET`    | `/`                   | Página de inicio (`index.html`)        | 200           |
-| `POST`   | `/avistamientos`      | Crea un avistamiento                   | 201, 400      |
-| `GET`    | `/avistamientos`      | Lista todos (el más reciente primero)  | 200           |
-| `GET`    | `/avistamientos/{id}` | Obtiene un avistamiento por ID         | 200, 400, 404 |
-| `PUT`    | `/avistamientos/{id}` | Reemplaza los datos de un avistamiento | 200, 400, 404 |
-| `DELETE` | `/avistamientos/{id}` | Elimina un avistamiento                | 204, 400, 404 |
-
-Los errores se devuelven como JSON con la forma `{"error":"mensaje"}`.
-
-Ejemplo del JSON de un avistamiento:
-
-```json
-{
-  "fecha_hora": "2026-10-10T18:30:00Z",
-  "ubicacion": "Ruta 3 km 280, Tandil",
-  "descripcion": "Jabalí cruzando la ruta",
-  "imagen": null,
-  "hubo_destrozos": true,
-  "detalle_destrozos": "Alambrado roto",
-  "nombre_reportante": "Tomas",
-  "email_reportante": "tomas@test.com"
-}
-```
-* Obligatorios: `fecha_hora`, `ubicacion` y `descripcion` (no pueden estar vacios).
-* Opcionales: `imagen`,`detalle_destrozos`,`nombre_reportante`y`email_reportante`.Pueden omitirse o enviarse como `null`.
-* Las respuestas incluyen además `id` y `created_at`, que asigna el servidor.
-* `PUT` reemplaza el registro completo: un campo opcional que no se envia queda en `null`.
-
-## Ejecutar la API
-
-Para dejar la API corriendo y usarla manualmente:
-
-```bash
-docker compose up --build
-```
-
-Se levantan dos contenedores:
-
-* `db`: PostgreSQL con el esquema de `db/schema/schema.sql` ya aplicado. También queda accesible desde la computadora en `localhost:5433`.
-* `app`: la API, disponible en <http://localhost:8080>. Arranca cuando la base está lista.
-
-Para detenerla, `Ctrl+C` y luego:
-
-```bash
-docker compose down        # conserva los datos
-docker compose down -v     # además elimina los datos
-```
-
-La aplicación toma la dirección de la base de la variable de entorno `DATABASE_URL`, que ya está definida en `compose.yaml`. Para ejecutarla sin contenedor para la aplicación:
-
-```bash
-docker compose up -d db
-export DATABASE_URL="postgres://postgres:postgres@localhost:5433/tpe_pw_test?sslmode=disable"
-go run .
-```
-
-## Prueba de la API
-
-Desde la raíz del proyecto ejecutar:
-
-```bash
-make test-api
-```
-
-Este comando realiza automáticamente las siguientes tareas:
-
-1. Genera el código Go utilizando `sqlc`.
-2. Compila el proyecto.
-3. Elimina contenedores y volúmenes de ejecuciones anteriores.
-4. Levanta PostgreSQL mediante Docker Compose.
-5. Espera hasta que PostgreSQL esté disponible.
-6. Construye y levanta la aplicación en un contenedor.
-7. Espera hasta que la API responda.
-8. Prueba cada uno de los endpoints con `requests.sh`.
-9. Elimina los contenedores y volúmenes utilizados al finalizar.
-
-La limpieza del entorno también se realiza si ocurre un error durante la ejecución. Si alguna prueba falla, el comando termina con error y muestra los logs de la aplicación.
-
-Con la API ya corriendo, las pruebas también se pueden ejecutar por separado:
-
-```bash
-bash requests.sh
-```
-
-El script ejecuta con `curl` todas las operaciones (crear, listar, obtener, actualizar y eliminar, más los casos de error), verifica el código de estado de cada una e imprime `[OK]` o `[ERROR]`. Termina con código distinto de cero si alguna falla. Para apuntar a otra dirección: `BASE_URL=http://otro-host:8080 bash requests.sh`.
-
-Ejemplo de una petición individual:
-
-```bash
-curl -i -X POST http://localhost:8080/avistamientos \
-  -H "Content-Type: application/json" \
-  -d '{"fecha_hora":"2026-10-10T18:30:00Z","ubicacion":"Tandil","descripcion":"Jabalí en el camino"}'
-```
-
-> `make test` y `make test-api` ejecutan `docker compose down -v`, por lo que eliminan los datos de la base. Conviene usarlos con la API detenida.
-
+Los tests realizan un ciclo CRUD completo sobre la entidad `Avistamiento`: creación, consulta por identificador, actualización, listado y eliminación. La base utilizada es temporal y se ejecuta dentro de Docker.
 
 ## Estructura principal
 
@@ -202,6 +147,11 @@ curl -i -X POST http://localhost:8080/avistamientos \
 │       ├── avistamientos_test.go
 │       ├── db.go
 │       └── models.go
+├── views/
+│   ├── layout.templ
+│   ├── avistamiento_form.templ
+│   ├── avistamientos_list.templ
+│   └── index_page.templ
 ├── docs/
 │   └── persistencia.md
 ├── .dockerignore
@@ -211,18 +161,9 @@ curl -i -X POST http://localhost:8080/avistamientos \
 ├── sqlc.yaml
 ├── go.mod
 ├── go.sum
-├── requests.sh
 ├── handlers.go
 ├── main.go
 └── README.md
 ```
+Junto a cada `.templ` hay un `_templ.go` generado por `make generate`.
 
-## Generación manual con sqlc
-
-Normalmente no es necesario ejecutar este paso manualmente porque `make test` ya lo realiza.
-
-En caso de querer regenerar únicamente el código de acceso a datos se puede ejecutar:
-
-```bash
-go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
-```
