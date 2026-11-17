@@ -1,6 +1,9 @@
 package views
 
-import db "tp1/db/sqlc"
+import (
+    "fmt"
+    db "tp1/db/sqlc"
+)
 
 templ AvistamientosList(avistamientos []db.Avistamiento) {
     <section id="avistamientos-list">
@@ -12,6 +15,7 @@ templ AvistamientosList(avistamientos []db.Avistamiento) {
                     <th>Ubicación</th>
                     <th>Descripción</th>
                     <th>Destrozos</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -26,6 +30,17 @@ templ AvistamientosList(avistamientos []db.Avistamiento) {
                             } else {
                                 No
                             }
+                        </td>
+                        <td>
+                            <button
+                                type="button"
+                                hx-delete={ fmt.Sprintf("/avistamientos/%d", avistamiento.ID) }
+                                hx-target="closest tr"
+                                hx-swap="outerHTML"
+                                hx-confirm="¿Estás seguro de que querés borrar este avistamiento?"
+                            >
+                                Borrar
+                            </button>
                         </td>
                     </tr>
                 }

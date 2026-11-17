@@ -205,7 +205,8 @@ func (s *Server) deleteAvistamiento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Respuesta vacía: HTMX reemplaza la fila por nada.
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) listAvistamientos(w http.ResponseWriter, r *http.Request) {
