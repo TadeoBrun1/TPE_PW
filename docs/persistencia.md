@@ -1,130 +1,241 @@
-# Persistencia de datos
+# Persistencia de datos — TP6
 
 ## Descripción general
 
-El proyecto implementa una plataforma para registrar avistamientos de jabalíes.
+La aplicación registra avistamientos de jabalíes utilizando PostgreSQL 18.
 
-Para la persistencia de los datos se utiliza PostgreSQL como sistema gestor de base de datos y `sqlc` como herramienta para generar código Go tipado a partir de consultas SQL.
+El acceso a datos se implementa con `database/sql`, el driver `lib/pq` y código Go tipado generado por sqlc.
 
-La entidad principal persistida es `Avistamiento`.
+HTMX modifica la manera de actualizar la interfaz. Los datos continúan almacenándose en PostgreSQL y las operaciones siguen ejecutándose en el servidor.
 
 ## Modelo de datos
 
-La tabla `avistamientos` contiene los siguientes atributos:
+El esquema se encuentra en `db/schema/schema.sql`.
 
-* `id`: identificador único del avistamiento. Es generado automáticamente por PostgreSQL.
-* `fecha_hora`: fecha y hora en la que ocurrió el avistamiento.
-* `ubicacion`: lugar donde ocurrió el avistamiento.
-* `descripcion`: descripción del avistamiento.
-* `imagen`: referencia opcional a una imagen asociada.
-* `hubo_destrozos`: indica si el avistamiento estuvo asociado a destrozos.
-* `detalle_destrozos`: descripción opcional de los destrozos.
-* `nombre_reportante`: nombre opcional de la persona que realizó el reporte.
-* `email_reportante`: correo electrónico opcional de la persona que realizó el reporte.
-* `created_at`: fecha y hora en la que el registro fue incorporado al sistema.
+La tabla principal es `avistamientos`:
 
-## Diferencia entre `fecha_hora` y `created_at`
+| Campo | Tipo PostgreSQL | Restricciones o valor predeterminado |
+|-------|-----------------|--------------------------------------|
+| `id` | SERIAL | Clave primaria generada automáticamente. |
+| `fecha_hora` | TIMESTAMP WITH TIME ZONE | NOT NULL. |
+| `ubicacion` | TEXT | NOT NULL. |
+| `descripcion` | TEXT | NOT NULL. |
+| `imagen` | TEXT | Permite NULL. |
+| `hubo_destrozos` | BOOLEAN | NOT NULL, DEFAULT FALSE. |
+| `detalle_destrozos` | TEXT | Permite NULL. |
+| `nombre_reportante` | VARCHAR(255) | Permite NULL. |
+| `email_reportante` | VARCHAR(255) | Permite NULL. |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT CURRENT_TIMESTAMP. |
 
-Estos campos representan dos momentos diferentes.
+`fecha_hora` indica cuándo ocurrió el avistamiento. `created_at` indica cuándo se incorporó el registro a la base.
 
-`fecha_hora` pertenece al dominio del avistamiento e indica cuándo ocurrió el hecho.
+El campo `imagen` almacena una referencia de texto, no el contenido binario de un archivo.
 
-`created_at` es un metadato del sistema e indica cuándo ese avistamiento fue registrado en la aplicación.
+## Campos opcionales y validaciones
 
-Esto permite distinguir, por ejemplo, un avistamiento ocurrido el día anterior de un reporte que fue incorporado recién hoy. También proporciona trazabilidad y permite ordenar o filtrar registros según el momento en que fueron cargados.
+Los campos `imagen`, `detalle_destrozos`, `nombre_reportante` y `email_reportante` permiten NULL.
 
-## Campos opcionales
+En el formulario, la función `textoOpcional` elimina espacios al principio y al final. Si el resultado está vacío, devuelve un `sql.NullString` con `Valid: false`, que se almacena como NULL.
 
-Los campos `imagen`, `detalle_destrozos`, `nombre_reportante` y `email_reportante` pueden almacenar `NULL`.
+`hubo_destrozos` no es un texto opcional: se guarda como true si la casilla está marcada y como false si está desmarcada.
 
-Esto se debe a que no siempre existe una imagen o un detalle de destrozos y el usuario puede realizar un reporte sin proporcionar información personal.
+El handler del formulario comprueba:
 
-En el código generado por `sqlc`, estos valores se representan mediante tipos como `sql.NullString`.
+- Que ubicación y descripción no estén vacías después de eliminar espacios.
+- Que fecha y hora tengan el formato esperado.
 
-## Acceso a datos con sqlc
+Las restricciones NOT NULL de PostgreSQL impiden almacenar NULL en los campos obligatorios, pero no impiden por sí mismas guardar cadenas vacías. Por eso la validación del servidor es necesaria.
 
-Las consultas SQL se encuentran en:
+El navegador también aplica las validaciones HTML, como los campos required y el formato del email.
 
-`db/queries/avistamientos.sql`
+## Tratamiento de fecha y hora
 
-Se implementan las operaciones CRUD principales:
+El formulario utiliza `datetime-local`, que envía una fecha y hora sin zona horaria.
 
-* creación de un avistamiento;
-* búsqueda de un avistamiento por identificador;
-* listado de avistamientos;
-* actualización de un avistamiento;
-* eliminación de un avistamiento.
+Actualmente el handler interpreta ese valor mediante:
 
-El esquema de la base de datos se encuentra en:
+```go
+time.Parse("2006-01-02T15:04", valor)
+```
 
-`db/schema/schema.sql`
+Al no indicar una zona, Go lo interpreta en UTC. La implementación no realiza una conversión explícita desde la zona horaria del usuario.
 
-La configuración de `sqlc` se encuentra en:
+La columna TIMESTAMP WITH TIME ZONE representa un instante; PostgreSQL no conserva el nombre de la zona horaria original.
 
-`sqlc.yaml`
+## Consultas y generación con sqlc
 
-A partir de estos archivos se ejecuta:
+Las consultas están definidas en `db/queries/avistamientos.sql`.
 
-`sqlc generate`
+| Consulta | Operación |
+|----------|-----------|
+| `CreateAvistamiento` | Inserta y devuelve el registro creado. |
+| `GetAvistamiento` | Busca por identificador. |
+| `ListAvistamientos` | Lista los registros por fecha_hora descendente. |
+| `UpdateAvistamiento` | Actualiza un registro por identificador. |
+| `DeleteAvistamiento` | Elimina un registro por identificador. |
 
-Esto genera automáticamente código Go tipado dentro de `db/sqlc`.
+La configuración se encuentra en `sqlc.yaml`.
 
-Los archivos generados no deben modificarse manualmente, ya que pueden volver a generarse a partir del esquema y las consultas SQL.
+Para regenerar el código:
 
+```bash
+make generate
+```
 
-## Uso desde la API
+Este comando ejecuta sqlc y también genera las vistas de templ.
 
-El código generado por `sqlc` es utilizado por los handlers de la API REST (`handlers.go`). En `main.go` se abre la conexión con `database/sql` y el driver `lib/pq`, y se crea el repositorio con `db.New(connection)`. Cada operación HTTP utiliza el método de `sqlc` correspondiente:
+El código de acceso a datos se genera en `db/sqlc/`. Los archivos generados deben regenerarse a partir del SQL, no editarse manualmente.
 
-* `POST /avistamientos` utiliza `CreateAvistamiento`;
-* `GET /avistamientos` utiliza `ListAvistamientos`;
-* `GET /avistamientos/{id}` utiliza `GetAvistamiento`;
-* `PUT /avistamientos/{id}` utiliza `UpdateAvistamiento`;
-* `DELETE /avistamientos/{id}` utiliza `DeleteAvistamiento`.
-Dado que `UpdateAvistamiento` y `DeleteAvistamiento` están definidas con `:exec`, no informan si el identificador existía. Por ese motivo, los handlers consultan primero el registro con `GetAvistamiento` y responden 404 si no existe.
+Las consultas utilizan parámetros como `$1` y `$2`; los valores no se concatenan directamente al SQL.
 
-Los campos opcionales se almacenan como `NULL` y `sqlc` los representa con `sql.NullString`. La API los convierte a `null` en el JSON de respuesta.
+## Integración con la interfaz del TP6
 
+En `main.go` se abre la conexión a partir de `DATABASE_URL`, se comprueba con `Ping` y se construye `db.New(conn)`.
 
+Las rutas registradas utilizan la persistencia de esta manera:
 
-## Base de datos de pruebas
+| Ruta | Acceso a datos | Respuesta exitosa |
+|------|----------------|------------------|
+| `GET /` | `ListAvistamientos` | Página HTML completa. |
+| `POST /avistamientos` | `CreateAvistamiento` y luego `ListAvistamientos` | Fragmento HTML de la lista actualizada. |
+| `DELETE /avistamientos/{id}` | `GetAvistamiento` y luego `DeleteAvistamiento` | Estado 200 con cuerpo vacío. |
 
-Los tests utilizan una instancia PostgreSQL ejecutada mediante Docker Compose.
+El alta recibe campos de formulario. No espera JSON y ya no redirige a la página principal.
 
-La base utilizada para las pruebas se denomina:
+Después del alta, HTMX reemplaza el contenedor de la lista con el HTML devuelto por el servidor.
 
-`tpe_pw_test`
+Después del borrado, HTMX elimina visualmente la fila al reemplazarla por la respuesta vacía.
 
-Al inicializar el contenedor, el archivo `db/schema/schema.sql` se monta en el directorio de inicialización de PostgreSQL, por lo que la estructura de la base se crea automáticamente.
+Las consultas SQL de actualización y consulta individual siguen disponibles en la capa de persistencia y se utilizan en las pruebas. Su existencia no implica que haya rutas HTTP registradas para todas ellas.
 
-El servicio `db` publica el puerto `5433` en la máquina local. El servicio `app` de la API usa la misma base, por lo que comparten esquema y datos; para las pruebas, los contenedores y volúmenes se eliminan al comenzar y al terminar.
+## Borrado y registros inexistentes
 
-Los tests realizan un ciclo CRUD completo sobre la entidad `Avistamiento`, comprobando las operaciones de creación, consulta, actualización, listado y eliminación.
+`DeleteAvistamiento` está definida con `:exec`, por lo que su método generado no devuelve el número de filas afectadas.
 
-## Ejecución automatizada
+El handler consulta primero el registro con `GetAvistamiento`:
 
-La ejecución de los tests se automatiza mediante el `Makefile`.
+- Identificador inválido: respuesta 400.
+- Registro inexistente: respuesta 404.
+- Error interno: respuesta 500.
+- Borrado exitoso: respuesta 200 sin cuerpo.
 
-El comando:
+La consulta previa y el borrado son operaciones separadas; no se ejecutan dentro de una transacción conjunta.
 
-`make test`
+## Configuración de PostgreSQL en Docker
 
-realiza las tareas necesarias para disponer de un entorno reproducible:
+El servicio `db` utiliza la imagen `postgres:18`.
 
-* genera nuevamente el código de `sqlc`;
-* compila el proyecto;
-* elimina contenedores y volúmenes anteriores;
-* inicia PostgreSQL mediante Docker Compose;
-* espera hasta que la base de datos esté disponible;
-* ejecuta los tests escritos con el paquete `testing` de Go;
-* elimina finalmente los contenedores y volúmenes utilizados.
+Configuración local:
 
-La limpieza final se realiza incluso si ocurre un error durante la ejecución, evitando dejar recursos Docker asociados a los tests.
+| Parámetro | Valor |
+|-----------|-------|
+| Base | `tpe_pw_test` |
+| Usuario | `postgres` |
+| Contraseña | `postgres` |
+| Dirección desde app | `db:5432` |
+| Dirección desde la computadora | `localhost:5433` |
 
-La disponibilidad se comprueba con `pg_isready -h localhost`, que se conecta por red. Durante la inicialización, PostgreSQL ejecuta un servidor temporal que solo escucha por socket local; de esta manera la base no se considera disponible hasta que el servidor definitivo está iniciado y el esquema ya fue aplicado.
+Estas credenciales corresponden al entorno académico local.
 
-Para probar la API completa (base de datos, aplicación y todos los endpoints) se utiliza:
+Compose proporciona a la aplicación:
 
+```text
+DATABASE_URL=postgres://postgres:postgres@db:5432/tpe_pw_test?sslmode=disable
+```
 
-`make test-api`
+No es necesario exportar esta variable manualmente para ejecutar `make run-app`.
 
+## Inicialización del esquema
+
+Compose monta:
+
+```text
+./db/schema/schema.sql
+```
+
+como:
+
+```text
+/docker-entrypoint-initdb.d/001-schema.sql
+```
+
+La imagen de PostgreSQL ejecuta ese archivo al inicializar un directorio de datos vacío.
+
+El script no se vuelve a aplicar automáticamente sobre un volumen que ya contiene una base inicializada. Para esta entrega, `make run-app` elimina el volumen anterior y permite reconstruir la base desde el esquema.
+
+El proyecto no incorpora un sistema de migraciones incrementales.
+
+## Volumen y duración de los datos
+
+Compose define el volumen `postgres_test_data` y lo monta en `/var/lib/postgresql`, conforme a la configuración utilizada para PostgreSQL 18.
+
+Docker Compose normalmente agrega el nombre del proyecto como prefijo al nombre físico del volumen.
+
+Mientras la aplicación está en ejecución, los datos están almacenados en PostgreSQL: recargar la página no los elimina.
+
+El comportamiento entre ejecuciones depende del comando:
+
+| Comando | Efecto sobre los datos |
+|---------|-----------------------|
+| `make run-app` | Elimina el volumen al iniciar y al finalizar. |
+| `make run` | Reutiliza el volumen existente; no incluye limpieza automática al salir. |
+| `make down` | Conserva el volumen. |
+| `make clean` | Elimina el volumen. |
+| `make test` | Elimina los datos anteriores y limpia al finalizar las pruebas. |
+
+La eliminación de datos con `make run-app` es intencional y responde al requisito de la entrega final.
+
+## Arranque y limpieza automatizados
+
+`make run-app` ejecuta `run-app.sh`.
+
+El script:
+
+1. Comprueba los requisitos básicos.
+2. Genera el código con sqlc y templ.
+3. Compila la aplicación mediante la construcción de la imagen Docker.
+4. Elimina el entorno anterior del proyecto.
+5. Inicia PostgreSQL.
+6. Espera su disponibilidad mediante `pg_isready -h localhost`.
+7. Inicia la aplicación.
+8. Elimina los contenedores y volúmenes al finalizar.
+
+La comprobación con `-h localhost` utiliza TCP. Esto evita tomar como listo el servidor temporal de inicialización que utiliza sockets locales.
+
+Compose también configura una comprobación de salud de PostgreSQL y la dependencia de la aplicación respecto de la base.
+
+La limpieza se registra con `trap` para la salida del script. Las señales INT y TERM provocan una salida que ejecuta esa limpieza. No puede garantizarse ante una terminación forzada con SIGKILL o un apagado del equipo.
+
+## Pruebas de persistencia
+
+Las pruebas se encuentran en:
+
+```text
+db/sqlc/avistamientos_test.go
+```
+
+Se ejecutan con:
+
+```bash
+make test
+```
+
+El Makefile genera el código, compila, prepara PostgreSQL, espera su disponibilidad y ejecuta `go test`. Al finalizar elimina los contenedores y volúmenes.
+
+Las pruebas verifican un ciclo CRUD: creación, consulta individual, actualización, listado y eliminación.
+
+La aplicación y las pruebas utilizan los mismos servicios y volumen de Compose. Por eso `make test` debe ejecutarse con la aplicación detenida y teniendo en cuenta que elimina sus datos.
+
+Estas pruebas no verifican el comportamiento de HTMX en el navegador. El alta y borrado sin recarga deben comprobarse también mediante la interfaz.
+
+## Verificación de la limpieza
+
+Después de detener `make run-app` con Ctrl+C y esperar su finalización:
+
+```bash
+docker compose ps -a
+```
+
+No deben quedar contenedores del proyecto.
+
+Durante la limpieza, Docker debe informar la eliminación del volumen correspondiente. Una nueva ejecución de `make run-app` reconstruye el esquema y comienza sin los avistamientos cargados en la sesión anterior.

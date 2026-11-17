@@ -48,3 +48,8 @@ down:
 
 clean: 
 	docker compose down -v
+
+.PHONY: run-app
+
+run-app:
+	bash ./run-app.sh
