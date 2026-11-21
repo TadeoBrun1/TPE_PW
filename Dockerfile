@@ -12,9 +12,6 @@ RUN adduser -D -u 10001 app
 WORKDIR /app
 
 COPY --from=build /out/server ./server
-COPY index.html ./index.html
-COPY css ./css
-COPY js ./js
 
 USER app
 EXPOSE 8080

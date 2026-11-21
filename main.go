@@ -33,25 +33,12 @@ func main() {
 	log.Println("Conectando a PostgreSQL")
 
 	server := &Server{queries: db.New(conn)}
-
-	http.HandleFunc("POST /avistamientos", server.createAvistamiento)
-	http.HandleFunc("GET /avistamientos", server.listAvistamientos)
-	http.HandleFunc("GET /avistamientos/{id}", server.getAvistamiento)
-	http.HandleFunc("PUT /avistamientos/{id}", server.updateAvistamiento)
+	http.HandleFunc("GET /{$}", server.indexHandler)
+	http.HandleFunc("POST /avistamientos", server.crearvistamientoForm)
 	http.HandleFunc("DELETE /avistamientos/{id}", server.deleteAvistamiento)
 
-	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		http.ServeFile(w, r, "./index.html")
-
-	}))
-
 	port := ":8080"
-	fmt.Printf("Servidor ESTÁTICO escuchando en http://localhost%s\n", port)
+	fmt.Printf("Servidor web escuchando en http://localhost%s\n", port)
 
 	err = http.ListenAndServe(port, nil)
 	if err != nil {

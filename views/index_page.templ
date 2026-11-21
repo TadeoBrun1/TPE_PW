@@ -1,0 +1,12 @@
+package views
+
+import db "tp1/db/sqlc"
+
+templ IndexPage(avistamientos []db.Avistamiento){
+    @Layout("Avistamientos de Jabalies"){
+        <h1>Avistamiento de Jabalies</h1>
+        @AvistamientoForm()
+        @AvistamientosList(avistamientos)
+    }
+
+}

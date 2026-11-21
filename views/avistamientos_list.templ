@@ -1,0 +1,65 @@
+package views
+
+import (
+    "fmt"
+    db "tp1/db/sqlc"
+)
+
+templ AvistamientosList(avistamientos []db.Avistamiento) {
+    <section id="avistamientos-list">
+        <h2>Avistamientos registrados</h2>
+
+        <style>
+            #avistamientos-list .lista-vacia {
+                display: none;
+            }
+
+            #avistamientos-list .lista-vacia:only-child {
+                display: table-row;
+            }
+        </style>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Ubicación</th>
+                    <th>Descripción</th>
+                    <th>Destrozos</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                for _, avistamiento := range avistamientos {
+                    <tr>
+                        <td>{ avistamiento.FechaHora.Format("02/01/2006 15:04") }</td>
+                        <td>{ avistamiento.Ubicacion }</td>
+                        <td>{ avistamiento.Descripcion }</td>
+                        <td>
+                            if avistamiento.HuboDestrozos {
+                                Sí
+                            } else {
+                                No
+                            }
+                        </td>
+                        <td>
+                            <button
+                                type="button"
+                                hx-delete={ fmt.Sprintf("/avistamientos/%d", avistamiento.ID) }
+                                hx-target="closest tr"
+                                hx-swap="outerHTML"
+                                hx-confirm="¿Estás seguro de que querés borrar este avistamiento?"
+                            >
+                                Borrar
+                            </button>
+                        </td>
+                    </tr>
+                }
+
+                <tr class="lista-vacia">
+                    <td colspan="5">No hay avistamientos registrados.</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+}
