@@ -164,24 +164,47 @@ Las credenciales incluidas en Compose son para el entorno académico local.
 | `make run-app` | Comando de entrega: genera, compila, reinicia el entorno, ejecuta y limpia al finalizar. |
 | `make generate` | Genera el código Go de sqlc y templ. |
 | `make build` | Genera el código y compila el proyecto localmente. |
-| `make run` | Ejecución alternativa para desarrollo; genera y levanta los servicios sin borrar automáticamente los volúmenes al salir. |
+| `make run` | Alias de `make run-app`: incluye limpieza previa y final de contenedores y volúmenes. |
 | `make down` | Elimina los contenedores y la red de Compose, conservando el volumen de datos. |
 | `make clean` | Elimina los contenedores, la red y los volúmenes. |
 | `make test` | Genera, compila y ejecuta las pruebas de persistencia con PostgreSQL; elimina los datos al comenzar y terminar. |
 
 No ejecutar `make test` al mismo tiempo que la aplicación: utiliza los mismos recursos de Compose y elimina sus datos.
 
-## Pruebas de persistencia
+## Pruebas automatizadas
 
-Ejecutar:
+Ejecutar con la aplicación detenida:
 
 ```bash
 make test
 ```
 
-Las pruebas se encuentran en `db/sqlc/avistamientos_test.go` y verifican operaciones CRUD sobre los avistamientos.
+El comando genera el código, compila, prepara PostgreSQL, ejecuta las
+pruebas y elimina los contenedores y volúmenes al finalizar.
 
-Estas pruebas verifican el acceso a datos. No reemplazan las pruebas de interacción con HTMX en el navegador.
+Se ejecutan dos grupos de pruebas:
+
+- `db/sqlc/avistamientos_test.go`: verifica creación, consulta individual,
+  actualización, listado y eliminación en PostgreSQL.
+- `handlers_test.go`: verifica el recorrido HTML mediante `httptest`,
+  utilizando los handlers y una base PostgreSQL real.
+
+El recorrido HTML comprueba:
+
+1. Página inicial con formulario y mensaje de lista vacía.
+2. Rechazo de un formulario inválido sin guardar datos.
+3. Alta correcta con respuesta HTML de la lista y sin redirección.
+4. Presencia del registro al consultar nuevamente la página.
+5. Borrado con estado 200 y cuerpo vacío.
+6. Ausencia del registro después del borrado.
+7. Respuesta 404 al intentar borrar un registro inexistente.
+8. Respuesta 400 ante un identificador inválido.
+
+La prueba HTML utiliza una transacción que se revierte al finalizar.
+El Makefile ejecuta los paquetes secuencialmente mediante `-p 1`.
+
+Estas pruebas no ejecutan JavaScript ni CSS en un navegador. Los reemplazos
+de HTMX y la visibilidad del mensaje de lista vacía se verifican manualmente.
 
 ## Verificación manual de la entrega
 
@@ -228,3 +251,12 @@ La salida debe estar vacía.
 - **Los cambios de las vistas no aparecen:** detener la aplicación, volver a ejecutar el comando y recargar el navegador.
 - **HTMX no carga:** comprobar la conexión a Internet y los errores de red del navegador.
 - **make informa una interrupción al presionar Ctrl+C:** puede deberse al código de salida de la señal; comprobar que haya terminado la limpieza.
+
+## Lista sin avistamientos
+
+Cuando no hay registros se muestra “No hay avistamientos registrados”.
+
+El mensaje se encuentra en una fila especial de la tabla. CSS la muestra
+únicamente cuando es la única fila del cuerpo de la tabla mediante
+`:only-child`. Al crear un avistamiento queda oculta y al borrar el último
+vuelve a mostrarse sin recargar la página y sin JavaScript propio.

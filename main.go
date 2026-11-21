@@ -38,7 +38,7 @@ func main() {
 	http.HandleFunc("DELETE /avistamientos/{id}", server.deleteAvistamiento)
 
 	port := ":8080"
-	fmt.Printf("Servidor ESTÁTICO escuchando en http://localhost%s\n", port)
+	fmt.Printf("Servidor web escuchando en http://localhost%s\n", port)
 
 	err = http.ListenAndServe(port, nil)
 	if err != nil {

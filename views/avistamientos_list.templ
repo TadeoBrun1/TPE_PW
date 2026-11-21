@@ -8,6 +8,17 @@ import (
 templ AvistamientosList(avistamientos []db.Avistamiento) {
     <section id="avistamientos-list">
         <h2>Avistamientos registrados</h2>
+
+        <style>
+            #avistamientos-list .lista-vacia {
+                display: none;
+            }
+
+            #avistamientos-list .lista-vacia:only-child {
+                display: table-row;
+            }
+        </style>
+
         <table>
             <thead>
                 <tr>
@@ -44,6 +55,10 @@ templ AvistamientosList(avistamientos []db.Avistamiento) {
                         </td>
                     </tr>
                 }
+
+                <tr class="lista-vacia">
+                    <td colspan="5">No hay avistamientos registrados.</td>
+                </tr>
             </tbody>
         </table>
     </section>

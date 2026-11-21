@@ -40,8 +40,7 @@ test: generate
 	TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5433/tpe_pw_test?sslmode=disable" \
 		go test -p 1 -v ./...
 
-run: generate
-	docker compose up --build
+run: run-app
 
 down: 
 	docker compose down

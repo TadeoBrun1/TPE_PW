@@ -178,7 +178,7 @@ El comportamiento entre ejecuciones depende del comando:
 | Comando | Efecto sobre los datos |
 |---------|-----------------------|
 | `make run-app` | Elimina el volumen al iniciar y al finalizar. |
-| `make run` | Reutiliza el volumen existente; no incluye limpieza automática al salir. |
+| `make run` | Alias de `make run-app`: elimina el volumen al iniciar y al finalizar. |
 | `make down` | Conserva el volumen. |
 | `make clean` | Elimina el volumen. |
 | `make test` | Elimina los datos anteriores y limpia al finalizar las pruebas. |
@@ -239,3 +239,20 @@ docker compose ps -a
 No deben quedar contenedores del proyecto.
 
 Durante la limpieza, Docker debe informar la eliminación del volumen correspondiente. Una nueva ejecución de `make run-app` reconstruye el esquema y comienza sin los avistamientos cargados en la sesión anterior.
+
+## Pruebas del recorrido HTML
+
+Además de las pruebas CRUD de `db/sqlc/avistamientos_test.go`,
+`handlers_test.go` comprueba las respuestas de los handlers HTTP
+utilizando `httptest` y PostgreSQL real.
+
+Verifica la página inicial, el rechazo de datos inválidos, el alta con
+respuesta HTML sin redirección, la consulta posterior, el borrado con
+respuesta 200 vacía y los errores 400 y 404.
+
+La prueba utiliza una transacción que se revierte al finalizar para
+deshacer sus cambios. Se ejecuta junto con las pruebas de persistencia
+mediante `make test`.
+
+No ejecuta HTMX ni CSS: el comportamiento visual se verifica mediante
+las pruebas manuales documentadas en el README.
