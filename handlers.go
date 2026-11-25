@@ -86,11 +86,7 @@ func parseID(r *http.Request) (int32, error) {
 	return int32(parseID), nil
 }
 
-func (s *Server) findAvistamiento(
-	w http.ResponseWriter,
-	r *http.Request,
-	id int32,
-) (db.Avistamiento, bool) {
+func (s *Server) findAvistamiento(w http.ResponseWriter, r *http.Request, id int32) (db.Avistamiento, bool) {
 	avistamiento, err := s.queries.GetAvistamiento(r.Context(), id)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -284,21 +280,13 @@ func validateAvistamiento(request avistamientoRequest) error {
 func (server *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
 	avistamientos, err := server.queries.ListAvistamientos(r.Context())
 	if err != nil {
-		http.Error(
-			w,
-			"No se pudieron obtener los avistamientos",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "No se pudieron obtener los avistamientos", http.StatusInternalServerError)
 		return
 	}
 
 	err = views.IndexPage(avistamientos).Render(r.Context(), w)
 	if err != nil {
-		http.Error(
-			w,
-			"No se pudo renderizar la pagina",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "No se pudo renderizar la pagina", http.StatusInternalServerError)
 	}
 }
 
@@ -313,11 +301,7 @@ func (server *Server) crearvistamientoForm(w http.ResponseWriter, r *http.Reques
 	descripcion := strings.TrimSpace(r.FormValue("descripcion"))
 
 	if ubicacion == "" || descripcion == "" {
-		http.Error(
-			w,
-			"la ubicacion y descripcion son obligatorios",
-			http.StatusBadRequest,
-		)
+		http.Error(w, "la ubicacion y descripcion son obligatorios", http.StatusBadRequest)
 		return
 	}
 
@@ -341,22 +325,14 @@ func (server *Server) crearvistamientoForm(w http.ResponseWriter, r *http.Reques
 		EmailReportante:  textoOpcional(r.FormValue("email_reportante")),
 	})
 	if err != nil {
-		http.Error(
-			w,
-			"No se pudo guardar el avistamiento",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "No se pudo guardar el avistamiento", http.StatusInternalServerError)
 		return
 	}
 
 	// Consultar la lista completa, incluyendo el nuevo avistamiento.
 	avistamientos, err := server.queries.ListAvistamientos(r.Context())
 	if err != nil {
-		http.Error(
-			w,
-			"No se pudieron obtener los avistamientos",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "No se pudieron obtener los avistamientos", http.StatusInternalServerError)
 		return
 	}
 
@@ -370,8 +346,5 @@ func (server *Server) crearvistamientoForm(w http.ResponseWriter, r *http.Reques
 
 func textoOpcional(texto string) sql.NullString {
 	textolimpio := strings.TrimSpace(texto)
-	return sql.NullString{
-		String: textolimpio,
-		Valid:  textolimpio != "",
-	}
+	return sql.NullString{String: textolimpio, Valid: textolimpio != ""}
 }
